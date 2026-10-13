@@ -28,13 +28,35 @@ GLOSSARY = {
 def lookup_term(term):
     return GLOSSARY.get(term, "not found")
 
-response = client.messages.create(
-    model="claude-sonnet-5-5",
-    max_tokens=500,
-    messages=[
-        {"role": "user", "content": "In one sentence, what is an AI agent?"}
-    ]
-)
+messages = [
+    {"role": "user", "content": "What does orchestrator mean?"}
+]
 
-print(response.content[0].text)
-print("stop_reason:", response.stop_reason)
+while True:
+    response = client.messages.create(
+        model="claude-sonnet-5-5",
+        max_tokens=500,
+        tools=TOOLS,
+        messages=messages,
+    )
+    print("stop_reason:", response.stop_reason)
+
+    if response.stop_reason != "tool_use":
+        break
+
+    messages.append({"role": "assistant", "content": response.content})
+
+    for block in response.content:
+        if block.type == "tool_use":
+            result = lookup_term(block.input["term"])
+            print("tool result:", result)
+            messages.append({
+                "role": "user",
+                "content": [
+                    {"type": "tool_result", "tool_use_id": block.id, "content": result}
+                ]
+            })
+
+for block in response.content:
+    if block.type == "text":
+        print(block.text)
