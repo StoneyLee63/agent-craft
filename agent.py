@@ -28,11 +28,21 @@ GLOSSARY = {
 def lookup_term(term):
     return GLOSSARY.get(term, "not found")
 
+question = input("Ask the glossary agent: ")
+
 messages = [
-    {"role": "user", "content": "What does orchestrator mean?"}
+    {"role": "user", "content": question}
 ]
 
+MAX_TURNS = 5
+turns = 0
+
 while True:
+    turns += 1
+    if turns > MAX_TURNS:
+        print("Stopped: hit the turn limit.")
+        break
+
     response = client.messages.create(
         model="claude-sonnet-5-5",
         max_tokens=500,
@@ -46,16 +56,16 @@ while True:
 
     messages.append({"role": "assistant", "content": response.content})
 
+    tool_results = []
+
     for block in response.content:
         if block.type == "tool_use":
             result = lookup_term(block.input["term"])
             print("tool result:", result)
-            messages.append({
-                "role": "user",
-                "content": [
-                    {"type": "tool_result", "tool_use_id": block.id, "content": result}
-                ]
-            })
+            tool_results.append(
+                {"type": "tool_result", "tool_use_id": block.id, "content": result}
+            )
+    messages.append({"role": "user", "content": tool_results})
 
 for block in response.content:
     if block.type == "text":
